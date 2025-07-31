@@ -27,3 +27,11 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Nats
+```bash
+$ docker run -d --name nats-server -p 4222:4222 -p 8222:8222 nats
+```
+If the container already exists:
+```bash
+$ docker start nats-server
+```

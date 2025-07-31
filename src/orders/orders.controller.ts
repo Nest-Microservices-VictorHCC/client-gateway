@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, ParseUUIDPip
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
-import { ORDERS_SERVICE } from 'src/config';
+import { NATS_SERVICE, ORDERS_SERVICE } from 'src/config';
 import { firstValueFrom } from 'rxjs';
 import { orderPaginationDto, StatusDto } from './dto';
 import { PaginationDto } from 'src/common';
@@ -10,24 +10,32 @@ import { PaginationDto } from 'src/common';
 @Controller('orders')
 export class OrdersController {
   constructor(
-    @Inject(ORDERS_SERVICE) private readonly ordersClient: ClientProxy, 
+    @Inject(NATS_SERVICE) private readonly client: ClientProxy, 
   ) {}
 
   @Post()
   create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersClient.send('createOrder', createOrderDto);
+    return this.client.send('createOrder', createOrderDto);
   }
 
   @Get()
-  findAll(@Query() orderPaginationDto: orderPaginationDto) {
-    return this.ordersClient.send('findAllOrders', orderPaginationDto);
+  async findAll(@Query() orderPaginationDto: orderPaginationDto) {
+    try {
+      const orders = await firstValueFrom(
+        this.client.send('findAllOrders', orderPaginationDto)
+      );
+
+      return orders;
+    } catch (error) {
+      throw new RpcException(error);
+    }
   }
 
   @Get('id/:id')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     try {
       const order = await firstValueFrom(
-        this.ordersClient.send('findOneOrder', { id })
+        this.client.send('findOneOrder', { id })
       )
 
       return order;
@@ -42,7 +50,7 @@ export class OrdersController {
     @Query() paginationDto: PaginationDto
   ) {
     try {
-      return this.ordersClient.send('findAllOrders', {
+      return this.client.send('findAllOrders', {
         ...paginationDto,
         status: statusDto.status
       })
@@ -57,7 +65,7 @@ export class OrdersController {
     @Body() updateOrderDto: UpdateOrderDto
   ) {
     try {
-      return this.ordersClient.send('updateOrderStatus', { id, ...updateOrderDto });
+      return this.client.send('updateOrderStatus', { id, ...updateOrderDto });
     } catch (error) {
       throw new RpcException(error);
     }
